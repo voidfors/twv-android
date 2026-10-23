@@ -73,6 +73,8 @@ interface TwitchGql {
 /** Список стримов и поиск. В расширении этих запросов нет — отдельная задача B2. */
 interface StreamsApi {
     suspend fun fetchStreams(cursor: String?, query: String?): Page<StreamItem>
+    /** Из переданных логинов — только те, кто сейчас в эфире (одним запросом). */
+    suspend fun fetchLiveChannels(logins: List<String>): List<StreamItem>
 }
 
 interface IrcClient {

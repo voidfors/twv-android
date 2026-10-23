@@ -3,7 +3,10 @@ package com.twv.viewers
 import android.os.Bundle
 import androidx.activity.ComponentActivity
 import androidx.activity.compose.setContent
+import androidx.compose.foundation.layout.fillMaxSize
 import androidx.compose.material3.MaterialTheme
+import androidx.compose.material3.Surface
+import androidx.compose.ui.Modifier
 import androidx.compose.runtime.collectAsState
 import androidx.compose.runtime.getValue
 import androidx.lifecycle.ViewModel
@@ -16,6 +19,7 @@ import com.twv.viewers.ui.HomeScreen
 import com.twv.viewers.ui.SettingsScreen
 import com.twv.viewers.ui.StreamsScreen
 import com.twv.viewers.ui.StreamsViewModel
+import com.twv.viewers.ui.TwvTheme
 import com.twv.viewers.ui.ViewersScreen
 import com.twv.viewers.ui.ViewersViewModel
 
@@ -24,7 +28,12 @@ class MainActivity : ComponentActivity() {
         super.onCreate(savedInstanceState)
         val container = (application as TwvApp).container
         setContent {
-            MaterialTheme {
+            TwvTheme {
+              Surface(
+                modifier = Modifier.fillMaxSize(),
+                color = MaterialTheme.colorScheme.background,
+                contentColor = MaterialTheme.colorScheme.onBackground
+              ) {
                 val nav = rememberNavController()
                 NavHost(navController = nav, startDestination = "streams") {
                     composable("streams") {
@@ -32,7 +41,7 @@ class MainActivity : ComponentActivity() {
                             factory = object : ViewModelProvider.Factory {
                                 @Suppress("UNCHECKED_CAST")
                                 override fun <T : ViewModel> create(modelClass: Class<T>): T =
-                                    StreamsViewModel(container.streams) as T
+                                    StreamsViewModel(container.streams, container.settings) as T
                             }
                         )
                         StreamsScreen(
@@ -62,6 +71,7 @@ class MainActivity : ComponentActivity() {
                         ViewersScreen(vm = vm, onBack = { nav.popBackStack() })
                     }
                 }
+              }
             }
         }
     }

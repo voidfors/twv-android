@@ -39,6 +39,46 @@ class GqlStreamsApi(
         }
     }
 
+    override suspend fun fetchLiveChannels(logins: List<String>): List<StreamItem> {
+        val clean = logins.map { it.trim().removePrefix("@").lowercase() }.filter { it.isNotEmpty() }.distinct().take(40)
+        if (clean.isEmpty()) return emptyList()
+        return try {
+            liveByLogins(clean)
+        } catch (e: kotlinx.coroutines.CancellationException) {
+            throw e
+        } catch (e: StreamsException) {
+            throw e
+        } catch (e: Exception) {
+            throw StreamsException(e.message ?: e.javaClass.simpleName, e)
+        }
+    }
+
+    /** Один запрос с алиасами u0, u1, … — по user(login:) на каждый канал. */
+    private suspend fun liveByLogins(logins: List<String>): List<StreamItem> {
+        val decl = logins.indices.joinToString(", ") { "\$l$it: String!" }
+        val body = logins.indices.joinToString("\n") { "  u$it: user(login: \$l$it) { $USER_FIELDS }" }
+        val vars = JSONObject()
+        logins.forEachIndexed { i, l -> vars.put("l$i", l) }
+        val data = post("query FavStreams($decl) {\n$body\n}", vars)
+        val out = ArrayList<StreamItem>()
+        for (i in logins.indices) {
+            val user = data.optJSONObject("u$i") ?: continue
+            val stream = user.optJSONObject("stream") ?: continue
+            out.add(
+                StreamItem(
+                    login = user.optString("login").ifEmpty { logins[i] }.lowercase(),
+                    displayName = user.optString("displayName").ifEmpty { logins[i] },
+                    avatarUrl = user.optString("profileImageURL").ifEmpty { null },
+                    title = stream.optString("title"),
+                    game = stream.optJSONObject("game")?.optString("displayName")?.ifEmpty { null },
+                    viewers = stream.optInt("viewersCount", 0),
+                    previewUrl = stream.optString("previewImageURL").ifEmpty { null }
+                )
+            )
+        }
+        return out
+    }
+
     private suspend fun post(query: String, variables: JSONObject): JSONObject = withContext(Dispatchers.IO) {
         val body = JSONObject().put("query", query).put("variables", variables).toString()
         val req = Request.Builder().url(url).header("Client-Id", CLIENT_ID)
@@ -107,15 +147,16 @@ class GqlStreamsApi(
     edges { cursor node {
       title viewersCount previewImageURL(width: 320, height: 180)
       game { displayName }
-      broadcaster { login displayName profileImageURL(width: 70) }
+      broadcaster { login displayName profileImageURL(width: 150) }
     } }
     pageInfo { hasNextPage }
   }
 }"""
+        private const val USER_FIELDS = """login displayName profileImageURL(width: 150)
+    stream { title viewersCount previewImageURL(width: 320, height: 180) game { displayName } }"""
         const val USER_QUERY = """query UserStream(${'$'}login: String!) {
   user(login: ${'$'}login) {
-    login displayName profileImageURL(width: 70)
-    stream { title viewersCount previewImageURL(width: 320, height: 180) game { displayName } }
+    $USER_FIELDS
   }
 }"""
     }
