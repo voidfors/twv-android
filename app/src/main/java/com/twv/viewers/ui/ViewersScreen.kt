@@ -163,7 +163,7 @@ fun ViewersScreen(vm: ViewersViewModel, onBack: () -> Unit) {
                     modifier = Modifier.padding(horizontal = 16.dp)
                 )
             }
-            if (showChart) RegistrationsChart(
+            if (showChart) RegistrationsChartPanel(
                 data = ui.chart, selected = ui.filter.month,
                 onSelect = { m -> vm.setMonth(if (m == ui.filter.month) null else m) }
             )
@@ -276,41 +276,4 @@ private fun AddChannelDialog(
     )
 }
 
-private fun monthLabel(m: MonthKey) = "%02d.%02d".format(m.month, m.year % 100)
-
-/** График регистраций аккаунтов по месяцам: тап по столбцу фильтрует список по этому месяцу. */
-@Composable
-private fun RegistrationsChart(data: List<Pair<MonthKey, Int>>, selected: MonthKey?, onSelect: (MonthKey) -> Unit) {
-    if (data.isEmpty()) {
-        Text(
-            "Нет данных о датах регистрации", Modifier.padding(16.dp),
-            style = MaterialTheme.typography.bodySmall, color = MaterialTheme.colorScheme.onSurfaceVariant
-        )
-        return
-    }
-    val max = data.maxOf { it.second }.coerceAtLeast(1)
-    LazyRow(
-        contentPadding = PaddingValues(horizontal = 16.dp, vertical = 8.dp),
-        horizontalArrangement = Arrangement.spacedBy(4.dp),
-        verticalAlignment = Alignment.Bottom
-    ) {
-        items(data) { (m, n) ->
-            val active = m == selected
-            Column(
-                Modifier.clickable { onSelect(m) },
-                horizontalAlignment = Alignment.CenterHorizontally
-            ) {
-                Text("$n", style = MaterialTheme.typography.labelSmall, color = MaterialTheme.colorScheme.onSurfaceVariant)
-                Box(
-                    Modifier.width(22.dp).height((4 + 80 * n / max).dp)
-                        .clip(RoundedCornerShape(topStart = 4.dp, topEnd = 4.dp))
-                        .background(
-                            if (active) MaterialTheme.colorScheme.primary
-                            else MaterialTheme.colorScheme.primary.copy(alpha = 0.45f)
-                        )
-                )
-                Text(monthLabel(m), style = MaterialTheme.typography.labelSmall, color = MaterialTheme.colorScheme.onSurfaceVariant)
-            }
-        }
-    }
-}
+internal fun monthLabel(m: MonthKey) = "%02d.%02d".format(m.month, m.year % 100)
