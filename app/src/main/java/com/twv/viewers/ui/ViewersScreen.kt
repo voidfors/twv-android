@@ -174,7 +174,9 @@ fun ViewersScreen(vm: ViewersViewModel, onBack: () -> Unit) {
                 contentPadding = PaddingValues(horizontal = 16.dp, vertical = 6.dp),
                 verticalArrangement = Arrangement.spacedBy(6.dp)
             ) {
-                items(ui.shown, key = { it.login }) { v ->
+                // Без key: позиция прокрутки привязана к индексу, а не к элементу,
+                // поэтому при смене сортировки / добавлении в избранное список не «следует» за элементом.
+                items(ui.shown) { v ->
                     ViewerRow(
                         v = v, favorite = v.login.lowercase() in favs,
                         showChannel = ui.channels.size > 1,
