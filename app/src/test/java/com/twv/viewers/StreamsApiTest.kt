@@ -97,7 +97,7 @@ class StreamsApiTest {
         assertEquals("VIEWER_COUNT", opts.getString("sort"))
         val langs = opts.getJSONArray("broadcasterLanguages")
         assertEquals(setOf("RU", "EN"), (0 until langs.length()).map { langs.getString(it) }.toSet())
-        assertEquals("speedrun", opts.getJSONArray("freeformTags").getJSONObject(0).getString("tagName"))
+        assertEquals("speedrun", opts.getJSONArray("freeformTags").getString(0))
     }
 
     @Test fun emptyFilterSendsOnlySort() = runBlocking {

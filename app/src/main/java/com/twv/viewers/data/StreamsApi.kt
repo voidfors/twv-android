@@ -97,13 +97,13 @@ class GqlStreamsApi(
     private suspend fun topStreams(cursor: String?, filter: StreamFilter): Page<StreamItem> {
         val vars = JSONObject().put("first", pageSize)
         if (cursor != null) vars.put("after", cursor)
-        // НЕ ПРОВЕРЕНО на живом Twitch: форма фильтров (язык — код заглавными, теги — freeformTags с tagName).
+        // НЕ ПРОВЕРЕНО на живом Twitch: форма фильтров (язык — код заглавными, теги — freeformTags как массив строк).
         val opts = JSONObject().put("sort", "VIEWER_COUNT")
         if (filter.languages.isNotEmpty()) {
             opts.put("broadcasterLanguages", JSONArray(filter.languages.map { it.uppercase() }))
         }
         if (filter.tags.isNotEmpty()) {
-            opts.put("freeformTags", JSONArray(filter.tags.map { JSONObject().put("tagName", it) }))
+            opts.put("freeformTags", JSONArray(filter.tags))
         }
         vars.put("options", opts)
         val streams = post(STREAMS_QUERY, vars).optJSONObject("streams")
