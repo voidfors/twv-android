@@ -74,16 +74,16 @@ fun ViewersScreen(vm: ViewersViewModel, onBack: () -> Unit, pip: Boolean = false
     var showChart by remember { mutableStateOf(false) }
 
     if (pip) {
-        // Картинка в картинке: только список, строки крупнее, без управления.
+        // Картинка в картинке: только список, компактные строки, без управления.
         LazyColumn(
             Modifier.fillMaxSize(),
-            contentPadding = PaddingValues(horizontal = 8.dp, vertical = 8.dp),
-            verticalArrangement = Arrangement.spacedBy(8.dp)
+            contentPadding = PaddingValues(horizontal = 4.dp, vertical = 4.dp),
+            verticalArrangement = Arrangement.spacedBy(3.dp)
         ) {
             items(ui.shown) { v ->
                 ViewerRow(
                     v = v, favorite = v.login.lowercase() in ui.filter.watched,
-                    showChannel = ui.channels.size > 1, onFavorite = null, large = true
+                    showChannel = ui.channels.size > 1, onFavorite = null, compact = true
                 )
             }
         }
@@ -215,25 +215,26 @@ fun ViewersScreen(vm: ViewersViewModel, onBack: () -> Unit, pip: Boolean = false
 
 @Composable
 private fun ViewerRow(
-    v: Viewer, favorite: Boolean, showChannel: Boolean, onFavorite: (() -> Unit)?, large: Boolean = false
+    v: Viewer, favorite: Boolean, showChannel: Boolean, onFavorite: (() -> Unit)?, compact: Boolean = false
 ) {
     // «Ушедшие» (первый пропуск прохода) приглушаются, но остаются читаемыми.
     val dim = if (v.missedPasses > 0) 0.6f else 1f
     Row(
-        Modifier.fillMaxWidth().alpha(dim).clip(RoundedCornerShape(14.dp))
+        Modifier.fillMaxWidth().alpha(dim).clip(RoundedCornerShape(if (compact) 8.dp else 14.dp))
             .background(MaterialTheme.colorScheme.surfaceContainer)
             .padding(
-                start = 12.dp, top = if (large) 12.dp else 8.dp,
-                bottom = if (large) 12.dp else 8.dp, end = if (large || onFavorite == null) 12.dp else 2.dp
+                start = if (compact) 6.dp else 12.dp, top = if (compact) 3.dp else 8.dp,
+                bottom = if (compact) 3.dp else 8.dp,
+                end = if (compact) 6.dp else if (onFavorite == null) 12.dp else 2.dp
             ),
         verticalAlignment = Alignment.CenterVertically,
-        horizontalArrangement = Arrangement.spacedBy(12.dp)
+        horizontalArrangement = Arrangement.spacedBy(if (compact) 6.dp else 12.dp)
     ) {
         val name = v.displayName.ifEmpty { v.login }
-        Avatar(v.avatarUrl, name, if (large) 56.dp else 42.dp)
-        Column(Modifier.weight(1f), verticalArrangement = Arrangement.spacedBy(2.dp)) {
+        Avatar(v.avatarUrl, name, if (compact) 26.dp else 42.dp)
+        Column(Modifier.weight(1f), verticalArrangement = Arrangement.spacedBy(if (compact) 0.dp else 2.dp)) {
             Text(
-                name, style = if (large) MaterialTheme.typography.titleMedium else MaterialTheme.typography.bodyLarge,
+                name, style = if (compact) MaterialTheme.typography.bodySmall else MaterialTheme.typography.bodyLarge,
                 fontWeight = FontWeight.SemiBold,
                 color = MaterialTheme.colorScheme.onSurface, maxLines = 1, overflow = TextOverflow.Ellipsis
             )
@@ -247,7 +248,7 @@ private fun ViewerRow(
             }
             Text(
                 parts.joinToString(" · "),
-                style = if (large) MaterialTheme.typography.bodyMedium else MaterialTheme.typography.bodySmall,
+                style = if (compact) MaterialTheme.typography.labelSmall else MaterialTheme.typography.bodySmall,
                 color = MaterialTheme.colorScheme.onSurfaceVariant, maxLines = 1, overflow = TextOverflow.Ellipsis
             )
         }
@@ -261,7 +262,7 @@ private fun ViewerRow(
                 )
             }
         } else if (favorite) {
-            Icon(Icons.Default.Star, contentDescription = "Избранный", tint = StarGold, modifier = Modifier.size(24.dp))
+            Icon(Icons.Default.Star, contentDescription = "Избранный", tint = StarGold, modifier = Modifier.size(if (compact) 14.dp else 24.dp))
         }
     }
 }
