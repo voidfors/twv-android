@@ -7,6 +7,7 @@ import okhttp3.MediaType.Companion.toMediaType
 import okhttp3.OkHttpClient
 import okhttp3.Request
 import okhttp3.RequestBody.Companion.toRequestBody
+import org.json.JSONArray
 import org.json.JSONObject
 import java.io.IOException
 
@@ -21,15 +22,15 @@ class StreamsException(message: String, cause: Throwable? = null) : IOException(
 class GqlStreamsApi(
     private val http: OkHttpClient = OkHttpClient(),
     private val url: String = GQL_URL,
-    private val pageSize: Int = 30
+    private val pageSize: Int = 10
 ) : StreamsApi {
 
     private val json = "application/json".toMediaType()
 
-    override suspend fun fetchStreams(cursor: String?, query: String?): Page<StreamItem> {
+    override suspend fun fetchStreams(cursor: String?, query: String?, filter: StreamFilter): Page<StreamItem> {
         val q = query.orEmpty().trim().removePrefix("@").lowercase()
         return try {
-            if (q.isEmpty()) topStreams(cursor) else searchByLogin(q)
+            if (q.isEmpty()) topStreams(cursor, filter) else searchByLogin(q)
         } catch (e: kotlinx.coroutines.CancellationException) {
             throw e
         } catch (e: StreamsException) {
@@ -93,9 +94,18 @@ class GqlStreamsApi(
         }
     }
 
-    private suspend fun topStreams(cursor: String?): Page<StreamItem> {
+    private suspend fun topStreams(cursor: String?, filter: StreamFilter): Page<StreamItem> {
         val vars = JSONObject().put("first", pageSize)
         if (cursor != null) vars.put("after", cursor)
+        // НЕ ПРОВЕРЕНО на живом Twitch: форма фильтров (язык — код заглавными, теги — freeformTags с tagName).
+        val opts = JSONObject().put("sort", "VIEWER_COUNT")
+        if (filter.languages.isNotEmpty()) {
+            opts.put("broadcasterLanguages", JSONArray(filter.languages.map { it.uppercase() }))
+        }
+        if (filter.tags.isNotEmpty()) {
+            opts.put("freeformTags", JSONArray(filter.tags.map { JSONObject().put("tagName", it) }))
+        }
+        vars.put("options", opts)
         val streams = post(STREAMS_QUERY, vars).optJSONObject("streams")
             ?: throw StreamsException("В ответе нет списка стримов")
         val edges = streams.optJSONArray("edges") ?: throw StreamsException("В ответе нет списка стримов")
@@ -142,8 +152,8 @@ class GqlStreamsApi(
     }
 
     companion object {
-        const val STREAMS_QUERY = """query Streams(${'$'}first: Int!, ${'$'}after: Cursor) {
-  streams(first: ${'$'}first, after: ${'$'}after, options: {sort: VIEWER_COUNT}) {
+        const val STREAMS_QUERY = """query Streams(${'$'}first: Int!, ${'$'}after: Cursor, ${'$'}options: StreamOptions) {
+  streams(first: ${'$'}first, after: ${'$'}after, options: ${'$'}options) {
     edges { cursor node {
       title viewersCount previewImageURL(width: 320, height: 180)
       game { displayName }

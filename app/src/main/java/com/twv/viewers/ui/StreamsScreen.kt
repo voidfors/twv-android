@@ -14,6 +14,7 @@ import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.layout.size
 import androidx.compose.foundation.lazy.LazyColumn
 import androidx.compose.foundation.lazy.items
+import androidx.compose.foundation.lazy.rememberLazyListState
 import androidx.compose.foundation.shape.CircleShape
 import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.material.icons.Icons
@@ -29,7 +30,10 @@ import androidx.compose.material3.MaterialTheme
 import androidx.compose.material3.Text
 import androidx.compose.material3.TextButton
 import androidx.compose.runtime.Composable
+import androidx.compose.runtime.LaunchedEffect
 import androidx.compose.runtime.collectAsState
+import androidx.compose.runtime.derivedStateOf
+import androidx.compose.runtime.remember
 import androidx.compose.runtime.getValue
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
@@ -53,6 +57,25 @@ fun StreamsScreen(vm: StreamsViewModel, onOpen: (String) -> Unit, onManual: () -
     val favLogins = liveFavs.map { it.login }.toSet()
     val rest = if (searching) ui.items else ui.items.filter { it.login !in favLogins }
 
+    // Ленивая подгрузка: когда до конца списка остаётся несколько строк — просим следующие 10.
+    val listState = rememberLazyListState()
+    val nearEnd by remember {
+        derivedStateOf {
+            val info = listState.layoutInfo
+            val last = info.visibleItemsInfo.lastOrNull()?.index ?: -1
+            info.totalItemsCount > 0 && last >= info.totalItemsCount - 4
+        }
+    }
+    // Избранные подгружаются позже основного списка и появляются над ним; Compose при этом держит
+    // позицию на прежнем элементе, и список оказывается прокручен мимо них. Когда блок избранных
+    // появляется, возвращаем список к началу.
+    val hasFavs = liveFavs.isNotEmpty()
+    LaunchedEffect(hasFavs) { if (hasFavs) listState.scrollToItem(0) }
+
+    LaunchedEffect(nearEnd, ui.items.size, ui.nextCursor, ui.loading, ui.error) {
+        if (nearEnd && !ui.loading && ui.nextCursor != null && ui.error == null) vm.loadMore()
+    }
+
     Column(Modifier.fillMaxSize()) {
         Row(
             Modifier.fillMaxWidth().padding(start = 20.dp, end = 8.dp, top = 12.dp),
@@ -70,12 +93,24 @@ fun StreamsScreen(vm: StreamsViewModel, onOpen: (String) -> Unit, onManual: () -
             value = ui.query, onValueChange = vm::setQuery, placeholder = "Поиск канала по логину",
             modifier = Modifier.fillMaxWidth().padding(horizontal = 16.dp, vertical = 8.dp)
         )
+        if (!ui.filter.isEmpty) {
+            val parts = buildList {
+                if (ui.filter.languages.isNotEmpty()) add(ui.filter.languages.sorted().joinToString(", ") { it.uppercase() })
+                addAll(ui.filter.tags.map { "#$it" })
+            }
+            Text(
+                "Фильтр: " + parts.joinToString(" · "), style = MaterialTheme.typography.labelMedium,
+                color = MaterialTheme.colorScheme.onSurfaceVariant, maxLines = 1, overflow = TextOverflow.Ellipsis,
+                modifier = Modifier.padding(horizontal = 20.dp)
+            )
+        }
         Box(Modifier.fillMaxWidth().height(3.dp)) {
             if (ui.loading) LinearProgressIndicator(Modifier.fillMaxWidth())
         }
 
         LazyColumn(
             Modifier.fillMaxSize(),
+            state = listState,
             contentPadding = PaddingValues(horizontal = 16.dp, vertical = 8.dp),
             verticalArrangement = Arrangement.spacedBy(8.dp)
         ) {
@@ -108,11 +143,6 @@ fun StreamsScreen(vm: StreamsViewModel, onOpen: (String) -> Unit, onManual: () -
                     s, favorite = s.login in ui.favorites,
                     onOpen = onOpen, onFavorite = { vm.toggleFavorite(s.login) }
                 )
-            }
-            if (ui.nextCursor != null) {
-                item(key = "more") {
-                    TextButton(onClick = vm::loadMore, modifier = Modifier.fillMaxWidth()) { Text("Показать ещё") }
-                }
             }
             if (ui.empty && ui.error == null && !ui.loading) {
                 item(key = "empty") {

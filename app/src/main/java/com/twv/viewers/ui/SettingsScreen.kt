@@ -7,22 +7,31 @@ import androidx.activity.result.contract.ActivityResultContracts
 import androidx.compose.foundation.background
 import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Column
+import androidx.compose.foundation.layout.ExperimentalLayoutApi
+import androidx.compose.foundation.layout.FlowRow
 import androidx.compose.foundation.layout.Row
 import androidx.compose.foundation.layout.fillMaxSize
 import androidx.compose.foundation.layout.fillMaxWidth
 import androidx.compose.foundation.layout.padding
+import androidx.compose.foundation.rememberScrollState
 import androidx.compose.foundation.shape.RoundedCornerShape
+import androidx.compose.foundation.verticalScroll
 import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.automirrored.filled.ArrowBack
+import androidx.compose.material3.FilterChip
 import androidx.compose.material3.Icon
 import androidx.compose.material3.IconButton
 import androidx.compose.material3.MaterialTheme
+import androidx.compose.material3.OutlinedTextField
 import androidx.compose.material3.Switch
 import androidx.compose.material3.Text
 import androidx.compose.material3.TextButton
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.collectAsState
 import androidx.compose.runtime.getValue
+import androidx.compose.runtime.mutableStateOf
+import androidx.compose.runtime.remember
+import androidx.compose.runtime.setValue
 import androidx.compose.runtime.rememberCoroutineScope
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
@@ -32,19 +41,33 @@ import androidx.compose.ui.unit.dp
 import com.twv.viewers.data.SettingsStore
 import kotlinx.coroutines.launch
 
+/** Языки трансляций для фильтра главной страницы: код ISO → название. */
+private val LANGUAGES = listOf(
+    "ru" to "Русский", "en" to "English", "uk" to "Українська", "de" to "Deutsch",
+    "es" to "Español", "fr" to "Français", "pt" to "Português", "pl" to "Polski",
+    "tr" to "Türkçe", "it" to "Italiano", "ja" to "日本語", "ko" to "한국어", "zh" to "中文"
+)
+
+@OptIn(ExperimentalLayoutApi::class)
 @Composable
 fun SettingsScreen(settings: SettingsStore, onBack: () -> Unit) {
     val chat by settings.chatEnabled.collectAsState(initial = true)
     val notify by settings.notifyFavorites.collectAsState(initial = false)
     val favorites by settings.favorites.collectAsState(initial = emptySet())
     val favChannels by settings.favoriteChannels.collectAsState(initial = emptySet())
+    val languages by settings.streamLanguages.collectAsState(initial = emptySet())
+    val tags by settings.streamTags.collectAsState(initial = emptyList())
+    var tagText by remember { mutableStateOf("") }
     val scope = rememberCoroutineScope()
 
     val permission = rememberLauncherForActivityResult(ActivityResultContracts.RequestPermission()) { granted ->
         scope.launch { settings.setNotifyFavorites(granted) }
     }
 
-    Column(Modifier.fillMaxSize().padding(16.dp), verticalArrangement = Arrangement.spacedBy(16.dp)) {
+    Column(
+        Modifier.fillMaxSize().verticalScroll(rememberScrollState()).padding(16.dp),
+        verticalArrangement = Arrangement.spacedBy(16.dp)
+    ) {
         Row(verticalAlignment = Alignment.CenterVertically) {
             IconButton(onClick = onBack) {
                 Icon(Icons.AutoMirrored.Filled.ArrowBack, contentDescription = "Назад")
@@ -72,6 +95,55 @@ fun SettingsScreen(settings: SettingsStore, onBack: () -> Unit) {
                 }
             }
         )
+        Column(
+            Modifier.fillMaxWidth().clip(RoundedCornerShape(14.dp))
+                .background(MaterialTheme.colorScheme.surfaceContainer).padding(14.dp),
+            verticalArrangement = Arrangement.spacedBy(8.dp)
+        ) {
+            Text("Список стримов на главной", style = MaterialTheme.typography.bodyLarge, color = MaterialTheme.colorScheme.onSurface)
+            Text(
+                "Язык трансляции (ничего не выбрано — любой)", style = MaterialTheme.typography.bodySmall,
+                color = MaterialTheme.colorScheme.onSurfaceVariant
+            )
+            FlowRow(horizontalArrangement = Arrangement.spacedBy(8.dp)) {
+                LANGUAGES.forEach { (code, name) ->
+                    FilterChip(
+                        selected = code in languages,
+                        onClick = { scope.launch { settings.setStreamLanguages(if (code in languages) languages - code else languages + code) } },
+                        label = { Text(name) }
+                    )
+                }
+            }
+            Text(
+                "Теги (ничего не добавлено — любые). Нажмите на тег, чтобы убрать", style = MaterialTheme.typography.bodySmall,
+                color = MaterialTheme.colorScheme.onSurfaceVariant
+            )
+            if (tags.isNotEmpty()) {
+                FlowRow(horizontalArrangement = Arrangement.spacedBy(8.dp)) {
+                    tags.forEach { tag ->
+                        FilterChip(
+                            selected = true,
+                            onClick = { scope.launch { settings.setStreamTags(tags - tag) } },
+                            label = { Text("$tag ✕") }
+                        )
+                    }
+                }
+            }
+            val addTag = {
+                val t = tagText.trim().removePrefix("#")
+                if (t.isNotEmpty() && tags.none { it.equals(t, ignoreCase = true) }) {
+                    scope.launch { settings.setStreamTags(tags + t) }
+                }
+                tagText = ""
+            }
+            Row(verticalAlignment = Alignment.CenterVertically) {
+                OutlinedTextField(
+                    value = tagText, onValueChange = { tagText = it }, singleLine = true,
+                    label = { Text("Новый тег") }, modifier = Modifier.weight(1f)
+                )
+                TextButton(onClick = addTag, enabled = tagText.isNotBlank()) { Text("Добавить") }
+            }
+        }
         Row(Modifier.fillMaxWidth(), verticalAlignment = Alignment.CenterVertically) {
             Text(
                 "Избранных зрителей: ${favorites.size}", Modifier.weight(1f),

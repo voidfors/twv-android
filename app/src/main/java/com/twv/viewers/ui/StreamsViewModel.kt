@@ -3,6 +3,7 @@ package com.twv.viewers.ui
 import androidx.lifecycle.ViewModel
 import androidx.lifecycle.viewModelScope
 import com.twv.viewers.StreamItem
+import com.twv.viewers.StreamFilter
 import com.twv.viewers.StreamsApi
 import com.twv.viewers.data.SettingsStore
 import kotlinx.coroutines.Job
@@ -10,6 +11,8 @@ import kotlinx.coroutines.delay
 import kotlinx.coroutines.flow.MutableStateFlow
 import kotlinx.coroutines.flow.StateFlow
 import kotlinx.coroutines.flow.asStateFlow
+import kotlinx.coroutines.flow.combine
+import kotlinx.coroutines.flow.distinctUntilChanged
 import kotlinx.coroutines.flow.update
 import kotlinx.coroutines.launch
 
@@ -24,7 +27,9 @@ data class StreamsUi(
     /** Логины избранных каналов. */
     val favorites: Set<String> = emptySet(),
     /** Избранные, которые сейчас в эфире (по зрителям, больше — выше). */
-    val liveFavorites: List<StreamItem> = emptyList()
+    val liveFavorites: List<StreamItem> = emptyList(),
+    /** Язык и теги из настроек. */
+    val filter: StreamFilter = StreamFilter()
 )
 
 class StreamsViewModel(
@@ -38,7 +43,15 @@ class StreamsViewModel(
     private var favJob: Job? = null
 
     init {
-        reload()
+        // Первая загрузка идёт уже с сохранённым фильтром; смена языка/тегов в настройках перезагружает список.
+        viewModelScope.launch {
+            combine(settings.streamLanguages, settings.streamTags) { l, t -> StreamFilter(l, t) }
+                .distinctUntilChanged()
+                .collect { f ->
+                    _ui.update { it.copy(filter = f) }
+                    reload()
+                }
+        }
         viewModelScope.launch {
             settings.favoriteChannels.collect { favs ->
                 _ui.update { it.copy(favorites = favs) }
@@ -93,7 +106,7 @@ class StreamsViewModel(
         val before = _ui.value
         _ui.update { it.copy(loading = true, error = null) }
         try {
-            val page = api.fetchStreams(if (reset) null else before.nextCursor, before.query)
+            val page = api.fetchStreams(if (reset) null else before.nextCursor, before.query, before.filter)
             _ui.update {
                 val merged = if (reset) page.items else (it.items + page.items).distinctBy { s -> s.login }
                 it.copy(items = merged, nextCursor = page.nextCursor, loading = false, empty = merged.isEmpty())

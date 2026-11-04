@@ -67,11 +67,28 @@ private val SORT_LABELS = listOf(
 
 @OptIn(ExperimentalMaterial3Api::class)
 @Composable
-fun ViewersScreen(vm: ViewersViewModel, onBack: () -> Unit) {
+fun ViewersScreen(vm: ViewersViewModel, onBack: () -> Unit, pip: Boolean = false, onPip: (() -> Unit)? = null) {
     val ui by vm.ui.collectAsState()
     val chat by vm.chatEnabled.collectAsState()
     var addDialog by remember { mutableStateOf(false) }
     var showChart by remember { mutableStateOf(false) }
+
+    if (pip) {
+        // Картинка в картинке: только список, строки крупнее, без управления.
+        LazyColumn(
+            Modifier.fillMaxSize(),
+            contentPadding = PaddingValues(horizontal = 8.dp, vertical = 8.dp),
+            verticalArrangement = Arrangement.spacedBy(8.dp)
+        ) {
+            items(ui.shown) { v ->
+                ViewerRow(
+                    v = v, favorite = v.login.lowercase() in ui.filter.watched,
+                    showChannel = ui.channels.size > 1, onFavorite = null, large = true
+                )
+            }
+        }
+        return
+    }
 
     Scaffold(
         containerColor = MaterialTheme.colorScheme.background,
@@ -102,6 +119,7 @@ fun ViewersScreen(vm: ViewersViewModel, onBack: () -> Unit) {
                     }
                 },
                 actions = {
+                    if (onPip != null) TextButton(onClick = onPip) { Text("PiP") }
                     IconButton(onClick = { addDialog = true }) {
                         Icon(Icons.Default.Add, contentDescription = "Добавить канал")
                     }
@@ -180,7 +198,7 @@ fun ViewersScreen(vm: ViewersViewModel, onBack: () -> Unit) {
                     ViewerRow(
                         v = v, favorite = v.login.lowercase() in favs,
                         showChannel = ui.channels.size > 1,
-                        onFavorite = { vm.toggleFavorite(v.login) }
+                        onFavorite = { vm.toggleFavorite(v) }
                     )
                 }
             }
@@ -196,21 +214,27 @@ fun ViewersScreen(vm: ViewersViewModel, onBack: () -> Unit) {
 }
 
 @Composable
-private fun ViewerRow(v: Viewer, favorite: Boolean, showChannel: Boolean, onFavorite: () -> Unit) {
+private fun ViewerRow(
+    v: Viewer, favorite: Boolean, showChannel: Boolean, onFavorite: (() -> Unit)?, large: Boolean = false
+) {
     // «Ушедшие» (первый пропуск прохода) приглушаются, но остаются читаемыми.
     val dim = if (v.missedPasses > 0) 0.6f else 1f
     Row(
         Modifier.fillMaxWidth().alpha(dim).clip(RoundedCornerShape(14.dp))
             .background(MaterialTheme.colorScheme.surfaceContainer)
-            .padding(start = 12.dp, top = 8.dp, bottom = 8.dp, end = 2.dp),
+            .padding(
+                start = 12.dp, top = if (large) 12.dp else 8.dp,
+                bottom = if (large) 12.dp else 8.dp, end = if (large || onFavorite == null) 12.dp else 2.dp
+            ),
         verticalAlignment = Alignment.CenterVertically,
         horizontalArrangement = Arrangement.spacedBy(12.dp)
     ) {
         val name = v.displayName.ifEmpty { v.login }
-        Avatar(v.avatarUrl, name, 42.dp)
+        Avatar(v.avatarUrl, name, if (large) 56.dp else 42.dp)
         Column(Modifier.weight(1f), verticalArrangement = Arrangement.spacedBy(2.dp)) {
             Text(
-                name, style = MaterialTheme.typography.bodyLarge, fontWeight = FontWeight.SemiBold,
+                name, style = if (large) MaterialTheme.typography.titleMedium else MaterialTheme.typography.bodyLarge,
+                fontWeight = FontWeight.SemiBold,
                 color = MaterialTheme.colorScheme.onSurface, maxLines = 1, overflow = TextOverflow.Ellipsis
             )
             val parts = buildList {
@@ -222,16 +246,22 @@ private fun ViewerRow(v: Viewer, favorite: Boolean, showChannel: Boolean, onFavo
                 if (showChannel) add(v.channel)
             }
             Text(
-                parts.joinToString(" · "), style = MaterialTheme.typography.bodySmall,
+                parts.joinToString(" · "),
+                style = if (large) MaterialTheme.typography.bodyMedium else MaterialTheme.typography.bodySmall,
                 color = MaterialTheme.colorScheme.onSurfaceVariant, maxLines = 1, overflow = TextOverflow.Ellipsis
             )
         }
-        IconButton(onClick = onFavorite) {
-            Icon(
-                Icons.Default.Star,
-                contentDescription = if (favorite) "Убрать из избранного" else "В избранное",
-                tint = if (favorite) StarGold else MaterialTheme.colorScheme.onSurfaceVariant.copy(alpha = 0.4f)
-            )
+        val starTint = if (favorite) StarGold else MaterialTheme.colorScheme.onSurfaceVariant.copy(alpha = 0.4f)
+        if (onFavorite != null) {
+            IconButton(onClick = onFavorite) {
+                Icon(
+                    Icons.Default.Star,
+                    contentDescription = if (favorite) "Убрать из избранного" else "В избранное",
+                    tint = starTint
+                )
+            }
+        } else if (favorite) {
+            Icon(Icons.Default.Star, contentDescription = "Избранный", tint = StarGold, modifier = Modifier.size(24.dp))
         }
     }
 }

@@ -61,6 +61,11 @@ data class ChatMessage(
 )
 
 data class Streamer(val login: String, val displayName: String, val avatarUrl: String?)
+/** Фильтр списка стримов из настроек. Пустое множество/список = без ограничения. */
+data class StreamFilter(val languages: Set<String> = emptySet(), val tags: List<String> = emptyList()) {
+    val isEmpty: Boolean get() = languages.isEmpty() && tags.isEmpty()
+}
+
 data class Page<T>(val items: List<T>, val nextCursor: String?)
 
 /** GQL, который реально есть в расширении: CommunityTab и GetChannelMeta. */
@@ -72,7 +77,7 @@ interface TwitchGql {
 
 /** Список стримов и поиск. В расширении этих запросов нет — отдельная задача B2. */
 interface StreamsApi {
-    suspend fun fetchStreams(cursor: String?, query: String?): Page<StreamItem>
+    suspend fun fetchStreams(cursor: String?, query: String?, filter: StreamFilter = StreamFilter()): Page<StreamItem>
     /** Из переданных логинов — только те, кто сейчас в эфире (одним запросом). */
     suspend fun fetchLiveChannels(logins: List<String>): List<StreamItem>
 }

@@ -88,4 +88,23 @@ class StreamsApiTest {
         enqueue("not json")
         assertTrue(runCatching { api.fetchStreams(null, null) }.exceptionOrNull() is StreamsException)
     }
+
+    @Test fun filterIsSentAsOptions() = runBlocking {
+        enqueue("""{"data":{"streams":{"edges":[],"pageInfo":{"hasNextPage":false}}}}""")
+        api.fetchStreams(null, null, StreamFilter(setOf("ru", "en"), listOf("speedrun")))
+        val opts = JSONObject(server.takeRequest().body.readUtf8())
+            .getJSONObject("variables").getJSONObject("options")
+        assertEquals("VIEWER_COUNT", opts.getString("sort"))
+        val langs = opts.getJSONArray("broadcasterLanguages")
+        assertEquals(setOf("RU", "EN"), (0 until langs.length()).map { langs.getString(it) }.toSet())
+        assertEquals("speedrun", opts.getJSONArray("freeformTags").getJSONObject(0).getString("tagName"))
+    }
+
+    @Test fun emptyFilterSendsOnlySort() = runBlocking {
+        enqueue("""{"data":{"streams":{"edges":[],"pageInfo":{"hasNextPage":false}}}}""")
+        api.fetchStreams(null, null)
+        val opts = JSONObject(server.takeRequest().body.readUtf8()).getJSONObject("variables").getJSONObject("options")
+        assertFalse(opts.has("broadcasterLanguages"))
+        assertFalse(opts.has("freeformTags"))
+    }
 }

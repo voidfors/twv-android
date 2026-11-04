@@ -38,7 +38,7 @@ class ViewersViewModel(private val c: AppContainer, firstChannel: String) : View
     @Volatile private var notifyOn = false
 
     private val alerts = FavoriteAlerts(
-        favorites = { favorites.value }, enabled = { notifyOn }, sink = c.notifier::notify
+        favorites = { favoriteLogins.value }, enabled = { notifyOn }, sink = c.notifier::notify
     )
 
     private val session = CollabSession(
@@ -50,11 +50,12 @@ class ViewersViewModel(private val c: AppContainer, firstChannel: String) : View
     val chatEnabled: StateFlow<Boolean> = c.settings.chatEnabled
         .stateIn(viewModelScope, SharingStarted.Eagerly, true)
 
-    val favorites: StateFlow<Set<String>> = c.settings.favorites
+    /** Общие избранные зрители (логины), одинаковые на всех каналах. */
+    private val favoriteLogins: StateFlow<Set<String>> = c.settings.favorites
         .stateIn(viewModelScope, SharingStarted.Eagerly, emptySet())
 
     val ui: StateFlow<ViewersUi> = combine(
-        session.viewers, filter, favorites, session.channels, session.total
+        session.viewers, filter, favoriteLogins, session.channels, session.total
     ) { all, f, fav, chs, total ->
         val effective = f.copy(watched = fav)
         val view = ViewerPipeline.build(all, effective)
@@ -98,8 +99,8 @@ class ViewersViewModel(private val c: AppContainer, firstChannel: String) : View
         filter.update { if (it.channel.equals(login, true)) it.copy(channel = null) else it }
     }
 
-    fun toggleFavorite(login: String) {
-        viewModelScope.launch { c.settings.toggleFavorite(login) }
+    fun toggleFavorite(v: Viewer) {
+        viewModelScope.launch { c.settings.toggleFavorite(v.login) }
     }
 
     fun setChatEnabled(on: Boolean) {
