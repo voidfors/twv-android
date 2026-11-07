@@ -1,4 +1,4 @@
-name: Build debug APK
+name: Build release APK
 on:
   workflow_dispatch:
   push:
@@ -17,9 +17,16 @@ jobs:
           gradle-version: 8.7
       - name: Unit tests
         run: gradle :app:testDebugUnitTest
-      - name: Build debug APK
-        run: gradle :app:assembleDebug
+      - name: Decode keystore
+        run: echo "${{ secrets.KEYSTORE_BASE64 }}" | base64 -d > "$RUNNER_TEMP/release.jks"
+      - name: Build release APK
+        run: gradle :app:assembleRelease
+        env:
+          KEYSTORE_FILE: ${{ runner.temp }}/release.jks
+          KEYSTORE_PASSWORD: ${{ secrets.KEYSTORE_PASSWORD }}
+          KEY_ALIAS: ${{ secrets.KEY_ALIAS }}
+          KEY_PASSWORD: ${{ secrets.KEY_PASSWORD }}
       - uses: actions/upload-artifact@v4
         with:
-          name: twv-debug-apk
-          path: app/build/outputs/apk/debug/app-debug.apk
+          name: twv-release-apk
+          path: app/build/outputs/apk/release/app-release.apk

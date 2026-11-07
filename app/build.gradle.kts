@@ -15,9 +15,28 @@ android {
         targetSdk = 34
         versionCode = 2
         versionName = "0.2.0"
+<<<<<<< HEAD
+=======
+    }
+    // Ключ релиза берётся из переменных окружения (CI). Без них — debug-ключ, чтобы локальная сборка не падала.
+    // Обновление поверх установленного APK работает только если ключ каждый раз один и тот же.
+    val releaseKeystore = System.getenv("KEYSTORE_FILE")
+    signingConfigs {
+        if (releaseKeystore != null) {
+            create("release") {
+                storeFile = file(releaseKeystore)
+                storePassword = System.getenv("KEYSTORE_PASSWORD")
+                keyAlias = System.getenv("KEY_ALIAS")
+                keyPassword = System.getenv("KEY_PASSWORD")
+            }
+        }
+>>>>>>> e7dbe0d (release)
     }
     buildTypes {
-        release { isMinifyEnabled = false }
+        release {
+            isMinifyEnabled = false
+            signingConfig = signingConfigs.getByName(if (releaseKeystore != null) "release" else "debug")
+        }
     }
     compileOptions {
         sourceCompatibility = JavaVersion.VERSION_17
