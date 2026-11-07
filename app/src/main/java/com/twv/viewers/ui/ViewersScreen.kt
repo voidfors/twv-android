@@ -2,6 +2,7 @@ package com.twv.viewers.ui
 
 import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Box
+import androidx.compose.foundation.layout.BoxWithConstraints
 import androidx.compose.foundation.layout.Column
 import androidx.compose.foundation.layout.PaddingValues
 import androidx.compose.foundation.layout.Row
@@ -20,6 +21,7 @@ import androidx.compose.foundation.background
 import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.automirrored.filled.ArrowBack
 import androidx.compose.material.icons.filled.Add
+import androidx.compose.material.icons.filled.Person
 import androidx.compose.material.icons.filled.Star
 import androidx.compose.material3.AlertDialog
 import androidx.compose.material3.ExperimentalMaterial3Api
@@ -46,7 +48,9 @@ import androidx.compose.ui.draw.alpha
 import androidx.compose.ui.draw.clip
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.text.style.TextOverflow
+import androidx.compose.ui.unit.Dp
 import androidx.compose.ui.unit.dp
+import androidx.compose.ui.unit.sp
 import com.twv.viewers.Source
 import com.twv.viewers.Viewer
 import com.twv.viewers.logic.MonthKey
@@ -54,6 +58,9 @@ import com.twv.viewers.logic.SortDir
 import com.twv.viewers.logic.SortMode
 import java.time.Instant
 import java.time.ZoneId
+
+/** Сколько зрителей помещается в окне картинки в картинке. */
+private const val PIP_ROWS = 10
 
 private val SORT_LABELS = listOf(
     SortMode.FOLLOWERS to "Фолловеры",
@@ -74,17 +81,22 @@ fun ViewersScreen(vm: ViewersViewModel, onBack: () -> Unit, pip: Boolean = false
     var showChart by remember { mutableStateOf(false) }
 
     if (pip) {
-        // Картинка в картинке: только список, компактные строки, без управления.
-        LazyColumn(
-            Modifier.fillMaxSize(),
-            contentPadding = PaddingValues(horizontal = 4.dp, vertical = 4.dp),
-            verticalArrangement = Arrangement.spacedBy(3.dp)
-        ) {
-            items(ui.shown) { v ->
-                ViewerRow(
-                    v = v, favorite = v.login.lowercase() in ui.filter.watched,
-                    showChannel = ui.channels.size > 1, onFavorite = null, compact = true
-                )
+        // Картинка в картинке: только список. Высота строки считается от высоты окна,
+        // чтобы на экране помещалось ровно PIP_ROWS зрителей, остальные — прокруткой.
+        BoxWithConstraints(Modifier.fillMaxSize()) {
+            val gap = 2.dp
+            val rowH = (maxHeight - 4.dp - gap * (PIP_ROWS - 1)) / PIP_ROWS
+            LazyColumn(
+                Modifier.fillMaxSize(),
+                contentPadding = PaddingValues(horizontal = 3.dp, vertical = 2.dp),
+                verticalArrangement = Arrangement.spacedBy(gap)
+            ) {
+                items(ui.shown) { v ->
+                    PipRow(
+                        v = v, favorite = v.login.lowercase() in ui.filter.watched,
+                        showChannel = ui.channels.size > 1, height = rowH
+                    )
+                }
             }
         }
         return
@@ -119,7 +131,9 @@ fun ViewersScreen(vm: ViewersViewModel, onBack: () -> Unit, pip: Boolean = false
                     }
                 },
                 actions = {
-                    if (onPip != null) TextButton(onClick = onPip) { Text("PiP") }
+                    if (onPip != null) IconButton(onClick = onPip) {
+                        Icon(PipIcon, contentDescription = "Картинка в картинке")
+                    }
                     IconButton(onClick = { addDialog = true }) {
                         Icon(Icons.Default.Add, contentDescription = "Добавить канал")
                     }
@@ -211,6 +225,55 @@ fun ViewersScreen(vm: ViewersViewModel, onBack: () -> Unit, pip: Boolean = false
         onRemove = vm::removeChannel,
         onDismiss = { addDialog = false }
     )
+}
+
+/** Компактная строка для картинки в картинке: аватар, ник, иконка + число фолловеров (2K), остальное. */
+@Composable
+private fun PipRow(v: Viewer, favorite: Boolean, showChannel: Boolean, height: Dp) {
+    val dim = if (v.missedPasses > 0) 0.6f else 1f
+    val name = v.displayName.ifEmpty { v.login }
+    val nameSp = (height.value * 0.36f).coerceIn(7f, 13f)
+    val infoSp = nameSp * 0.82f
+    val muted = MaterialTheme.colorScheme.onSurfaceVariant
+    Row(
+        Modifier.fillMaxWidth().height(height).alpha(dim).clip(RoundedCornerShape(6.dp))
+            .background(MaterialTheme.colorScheme.surfaceContainer)
+            .padding(horizontal = 4.dp),
+        verticalAlignment = Alignment.CenterVertically,
+        horizontalArrangement = Arrangement.spacedBy(5.dp)
+    ) {
+        Avatar(v.avatarUrl, name, (height - 6.dp).coerceAtLeast(12.dp))
+        Column(Modifier.weight(1f), verticalArrangement = Arrangement.Center) {
+            Text(
+                name, fontSize = nameSp.sp, lineHeight = (nameSp * 1.1f).sp,
+                fontWeight = FontWeight.SemiBold, color = MaterialTheme.colorScheme.onSurface,
+                maxLines = 1, overflow = TextOverflow.Ellipsis
+            )
+            Row(verticalAlignment = Alignment.CenterVertically) {
+                Icon(Icons.Default.Person, contentDescription = "Фолловеры", tint = muted, modifier = Modifier.size((infoSp + 1f).dp))
+                Text(
+                    v.followers?.let { formatCount(it) } ?: "…",
+                    fontSize = infoSp.sp, lineHeight = (infoSp * 1.1f).sp, color = muted, maxLines = 1
+                )
+                val rest = buildList {
+                    formatDate(v.createdAt)?.let { add("с $it") }
+                    if (v.msgCount > 0) add("${v.msgCount} сообщ.")
+                    add(if (v.source == Source.CHAT) "чат" else "список")
+                    if (v.moved) add("перешёл")
+                    if (showChannel) add(v.channel)
+                }
+                Text(
+                    " · " + rest.joinToString(" · "),
+                    fontSize = infoSp.sp, lineHeight = (infoSp * 1.1f).sp, color = muted,
+                    maxLines = 1, overflow = TextOverflow.Ellipsis, modifier = Modifier.weight(1f)
+                )
+            }
+        }
+        if (favorite) Icon(
+            Icons.Default.Star, contentDescription = "Избранный", tint = StarGold,
+            modifier = Modifier.size((nameSp + 2f).dp)
+        )
+    }
 }
 
 @Composable

@@ -15,8 +15,8 @@ import com.twv.viewers.MainActivity
 import com.twv.viewers.Viewer
 
 /**
- * Уведомления об избранных зрителях. Работают, пока жив экран зрителей (процесс приложения):
- * фонового сервиса нет, сбор данных идёт только при открытом канале.
+ * Уведомления об избранных зрителях. Работают, пока открыт канал — в том числе когда приложение
+ * в фоне: процесс держит [MonitorService]. После закрытия экрана канала сбор останавливается.
  */
 class FavoriteNotifier(private val context: Context) {
     private val channelId = "favorites"
@@ -36,7 +36,8 @@ class FavoriteNotifier(private val context: Context) {
             != PackageManager.PERMISSION_GRANTED
         ) return
         val open = PendingIntent.getActivity(
-            context, 0, Intent(context, MainActivity::class.java),
+            context, 0,
+            Intent(context, MainActivity::class.java).addFlags(Intent.FLAG_ACTIVITY_NEW_TASK or Intent.FLAG_ACTIVITY_SINGLE_TOP),
             PendingIntent.FLAG_IMMUTABLE or PendingIntent.FLAG_UPDATE_CURRENT
         )
         val n = NotificationCompat.Builder(context, channelId)

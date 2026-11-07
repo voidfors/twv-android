@@ -16,6 +16,8 @@ import java.util.concurrent.TimeUnit
 
 /** Ручной DI: достаточно для приложения из двух экранов. */
 class AppContainer(context: Context) {
+    val appContext: Context = context.applicationContext
+
     private val http = OkHttpClient.Builder()
         .connectTimeout(15, TimeUnit.SECONDS)
         .readTimeout(30, TimeUnit.SECONDS)

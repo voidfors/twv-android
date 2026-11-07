@@ -12,7 +12,6 @@ import androidx.compose.material3.MaterialTheme
 import androidx.compose.material3.Surface
 import androidx.compose.ui.Modifier
 import androidx.compose.runtime.DisposableEffect
-import androidx.compose.runtime.LaunchedEffect
 import androidx.compose.runtime.collectAsState
 import androidx.compose.runtime.mutableStateOf
 import androidx.compose.runtime.getValue
@@ -37,18 +36,13 @@ class MainActivity : ComponentActivity() {
 
     private fun pipParams(): PictureInPictureParams {
         val b = PictureInPictureParams.Builder().setAspectRatio(Rational(9, 16)) // высокое окно под список
-        if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.S) b.setAutoEnterEnabled(pipReady.value)
+        // Только по кнопке: автопереход при выходе на «Домой» выключен.
+        if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.S) b.setAutoEnterEnabled(false)
         return b.build()
     }
 
     private fun enterPip() {
         if (pipReady.value) enterPictureInPictureMode(pipParams())
-    }
-
-    // Android 12+ уходит в PiP сам (autoEnter); на 8–11 — по нажатию «Домой».
-    override fun onUserLeaveHint() {
-        super.onUserLeaveHint()
-        if (Build.VERSION.SDK_INT < Build.VERSION_CODES.S) enterPip()
     }
 
     @Suppress("DEPRECATION")
@@ -68,7 +62,6 @@ class MainActivity : ComponentActivity() {
                 contentColor = MaterialTheme.colorScheme.onBackground
               ) {
                 val nav = rememberNavController()
-                LaunchedEffect(pipReady.value) { setPictureInPictureParams(pipParams()) }
                 NavHost(navController = nav, startDestination = "streams") {
                     composable("streams") {
                         val vm: StreamsViewModel = viewModel(

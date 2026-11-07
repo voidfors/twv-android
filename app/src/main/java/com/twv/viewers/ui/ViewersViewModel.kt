@@ -4,6 +4,7 @@ import androidx.lifecycle.ViewModel
 import androidx.lifecycle.viewModelScope
 import com.twv.viewers.AppContainer
 import com.twv.viewers.Viewer
+import com.twv.viewers.data.MonitorService
 import com.twv.viewers.logic.CollabSession
 import com.twv.viewers.logic.FavoriteAlerts
 import com.twv.viewers.logic.MonthKey
@@ -76,7 +77,13 @@ class ViewersViewModel(private val c: AppContainer, firstChannel: String) : View
             session.addChannel(firstChannel)
             c.settings.pushRecentChannel(firstChannel)
         }
-        viewModelScope.launch { c.settings.notifyFavorites.collect { notifyOn = it } }
+        viewModelScope.launch {
+            // Уведомления включены — держим процесс живым в фоне (без картинки в картинке тоже).
+            c.settings.notifyFavorites.collect {
+                notifyOn = it
+                if (it) MonitorService.start(c.appContext) else MonitorService.stop(c.appContext)
+            }
+        }
         viewModelScope.launch {
             c.settings.chatEnabled.collect { on -> chatOn = on; session.setChat(on) }
         }
@@ -108,6 +115,7 @@ class ViewersViewModel(private val c: AppContainer, firstChannel: String) : View
     }
 
     override fun onCleared() {
+        MonitorService.stop(c.appContext)
         session.stop()
     }
 }
