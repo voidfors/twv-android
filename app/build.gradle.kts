@@ -15,8 +15,6 @@ android {
         targetSdk = 34
         versionCode = 2
         versionName = "0.2.0"
-<<<<<<< HEAD
-=======
     }
     // Ключ релиза берётся из переменных окружения (CI). Без них — debug-ключ, чтобы локальная сборка не падала.
     // Обновление поверх установленного APK работает только если ключ каждый раз один и тот же.
@@ -30,7 +28,6 @@ android {
                 keyPassword = System.getenv("KEY_PASSWORD")
             }
         }
->>>>>>> e7dbe0d (release)
     }
     buildTypes {
         release {
