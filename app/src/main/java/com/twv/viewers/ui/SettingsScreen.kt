@@ -3,6 +3,7 @@ package com.twv.viewers.ui
 import android.Manifest
 import android.os.Build
 import androidx.activity.compose.rememberLauncherForActivityResult
+import androidx.activity.result.IntentSenderRequest
 import androidx.activity.result.contract.ActivityResultContracts
 import androidx.compose.foundation.background
 import androidx.compose.foundation.layout.Arrangement
@@ -18,6 +19,7 @@ import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.foundation.verticalScroll
 import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.automirrored.filled.ArrowBack
+import androidx.compose.material3.Button
 import androidx.compose.material3.FilterChip
 import androidx.compose.material3.Icon
 import androidx.compose.material3.IconButton
@@ -39,6 +41,7 @@ import androidx.compose.ui.draw.clip
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.unit.dp
 import com.twv.viewers.data.SettingsStore
+import com.twv.viewers.data.SyncManager
 import kotlinx.coroutines.launch
 
 /** Языки трансляций для фильтра главной страницы: код ISO → название. */
@@ -50,15 +53,22 @@ private val LANGUAGES = listOf(
 
 @OptIn(ExperimentalLayoutApi::class)
 @Composable
-fun SettingsScreen(settings: SettingsStore, onBack: () -> Unit) {
+fun SettingsScreen(settings: SettingsStore, sync: SyncManager, onBack: () -> Unit) {
     val chat by settings.chatEnabled.collectAsState(initial = true)
     val notify by settings.notifyFavorites.collectAsState(initial = false)
     val favorites by settings.favorites.collectAsState(initial = emptySet())
     val favChannels by settings.favoriteChannels.collectAsState(initial = emptySet())
     val languages by settings.streamLanguages.collectAsState(initial = emptySet())
     val tags by settings.streamTags.collectAsState(initial = emptyList())
+    val syncOn by settings.syncEnabled.collectAsState(initial = true)
+    val account by settings.syncAccount.collectAsState(initial = null)
+    val syncStatus by sync.status.collectAsState()
     var tagText by remember { mutableStateOf("") }
     val scope = rememberCoroutineScope()
+
+    val signIn = rememberLauncherForActivityResult(ActivityResultContracts.StartIntentSenderForResult()) { res ->
+        scope.launch { sync.onSignInResult(res.data) }
+    }
 
     val permission = rememberLauncherForActivityResult(ActivityResultContracts.RequestPermission()) { granted ->
         scope.launch { settings.setNotifyFavorites(granted) }
@@ -142,6 +152,40 @@ fun SettingsScreen(settings: SettingsStore, onBack: () -> Unit) {
                     label = { Text("Новый тег") }, modifier = Modifier.weight(1f)
                 )
                 TextButton(onClick = addTag, enabled = tagText.isNotBlank()) { Text("Добавить") }
+            }
+        }
+        SettingRow(
+            title = "Синхронизация с Google",
+            hint = "Настройки, избранные зрители и каналы хранятся в скрытой папке приложения на вашем Google Drive и совпадают на всех устройствах",
+            checked = syncOn,
+            onChange = { scope.launch { settings.setSyncEnabled(it) } }
+        )
+        if (syncOn) {
+            Column(
+                Modifier.fillMaxWidth().clip(RoundedCornerShape(14.dp))
+                    .background(MaterialTheme.colorScheme.surfaceContainer).padding(14.dp),
+                verticalArrangement = Arrangement.spacedBy(8.dp)
+            ) {
+                if (account == null) {
+                    Text(
+                        "Чтобы синхронизировать, войдите в аккаунт Google",
+                        style = MaterialTheme.typography.bodySmall, color = MaterialTheme.colorScheme.onSurfaceVariant
+                    )
+                    Button(onClick = {
+                        scope.launch {
+                            sync.beginSignIn()?.let { signIn.launch(IntentSenderRequest.Builder(it.intentSender).build()) }
+                        }
+                    }) { Text("Войти в Google") }
+                } else {
+                    Text("Аккаунт: $account", style = MaterialTheme.typography.bodyLarge, color = MaterialTheme.colorScheme.onSurface)
+                    Row {
+                        TextButton(onClick = { sync.syncNow() }) { Text("Синхронизировать сейчас") }
+                        TextButton(onClick = { scope.launch { sync.signOut() } }) { Text("Выйти") }
+                    }
+                }
+                if (syncStatus.isNotEmpty()) {
+                    Text(syncStatus, style = MaterialTheme.typography.bodySmall, color = MaterialTheme.colorScheme.onSurfaceVariant)
+                }
             }
         }
         Row(Modifier.fillMaxWidth(), verticalAlignment = Alignment.CenterVertically) {

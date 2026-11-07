@@ -13,8 +13,8 @@ android {
         applicationId = "com.twv.viewers"
         minSdk = 26
         targetSdk = 34
-        versionCode = 2
-        versionName = "0.2.0"
+        versionCode = 3
+        versionName = "0.3.0"
     }
     // Ключ релиза берётся из переменных окружения (CI). Без них — debug-ключ, чтобы локальная сборка не падала.
     // Обновление поверх установленного APK работает только если ключ каждый раз один и тот же.
@@ -65,6 +65,7 @@ dependencies {
     implementation("androidx.datastore:datastore-preferences:1.1.1")
     implementation("io.coil-kt:coil-compose:2.7.0")
     implementation("androidx.core:core-ktx:1.13.1")
+    implementation("com.google.android.gms:play-services-auth:21.2.0")
 
     testImplementation("junit:junit:4.13.2")
     testImplementation("org.jetbrains.kotlinx:kotlinx-coroutines-test:1.8.1")

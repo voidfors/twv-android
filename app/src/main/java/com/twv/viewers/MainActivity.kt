@@ -79,7 +79,7 @@ class MainActivity : ComponentActivity() {
                         )
                     }
                     composable("settings") {
-                        SettingsScreen(settings = container.settings, onBack = { nav.popBackStack() })
+                        SettingsScreen(settings = container.settings, sync = container.sync, onBack = { nav.popBackStack() })
                     }
                     composable("home") {
                         val recent by container.settings.recentChannels.collectAsState(initial = emptyList())
